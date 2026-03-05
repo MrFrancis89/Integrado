@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ficha Técnica Pro</title>
+<!-- FICHA TÉCNICA PRO v1.2.0 — Módulo independente para StockFlow Pro
+CORREÇÕES v1.1.0:
+[CRÍTICO] cardapioModule.render — sizeCells.slice(0,3) operava sobre STRING não array.
+  Fix: manter sizeCells como array; .join('') só na interpolação.
+[CRÍTICO] fichaModule.adicionarIngrediente — const sel/opts mortos + prompt() inválido em iOS PWA.
+  Fix: modal customizado com <select> nativo.
+[BUG] FTCalc — sentinel pesoEmbalagem===1 ambíguo para embalagem real de 1g.
+  Fix: campo tipo:'peso'|'unidade' explícito no modelo.
+[BUG] fichaModule.atualizarSelectPizzas — dupla seleção inconsistente cur vs _pizzaSelecionadaId.
+  Fix: usa apenas _pizzaSelecionadaId como fonte de verdade.
+[BUG] FTStorage.load — não validava estrutura; JSON parcial causava TypeError.
+  Fix: _validarEMigrar() com merge de defaults e migração de campos.
+[BUG] exportData — shallow copy expunha referências internas.
+  Fix: JSON.parse(JSON.stringify(DATA)).
+[BUG] preparoModule.calcular — SIZES redeclarada no escopo local.
+  Fix: usa SIZES do escopo global.
+[BUG] atualizarQtd/atualizarPreco — cardapioModule.render() sem debounce a cada keystroke.
+  Fix: debounce 400ms.
+[BUG] syncFromStockFlow — item.preco não existe no modelo StockFlow v9.7.4.
+  Fix: comentário e guard explícito; integração documentada como futura.
+[BUG] Label "Peso (g)" errado para itens unitários.
+  Fix: label dinâmico "Qtd" vs "Peso (g)".
+[BUG] CSS .ft-modal-close — position:absolute sem pai position:relative.
+  Fix: position:relative no .ft-modal.
+[MENOR] FTUtils.nextId — Math.max(...spread) → reduce.
+[MENOR] Enter key não submetia formulários. Fix: listeners keydown.
+[MENOR] ingredientesMap() chamado 2x em atualizarQtd. Fix: uma chamada.
+[DEAD CODE] --ft-sky, .ft-modal-overlay antigas, opts/sel em adicionarIngrediente. Removidos.
+-->
+<style>
+:root {
+  --bg:#0a0a0f;--surface-1:#13131a;--surface-2:#1c1c28;--surface-3:#252535;
+  --border:rgba(255,255,255,0.08);--border-mid:rgba(255,255,255,0.14);
+  --text-1:#f0f0f5;--text-2:#a0a0b8;--text-3:#606078;
+  --accent:#4da8ff;--accent-dim:rgba(77,168,255,0.15);
+  --green:#34d399;--green-dim:rgba(52,211,153,0.15);
+  --red:#f87171;--red-dim:rgba(248,113,113,0.15);
+  --yellow:#fbbf24;
+  --ft-teal:#1a6b6b;--ft-teal-hdr:#0d4f4f;--ft-blue:#1a4a8a;
+  --ft-blue-row:rgba(26,74,138,0.25);--ft-red:#8b1a1a;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;--radius-full:999px;
+  --font:-apple-system,'SF Pro Display','Inter',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:var(--font);background:var(--bg);color:var(--text-1);min-height:100dvh;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+.ft-header{background:linear-gradient(135deg,var(--ft-teal-hdr),var(--ft-teal));border-bottom:3px solid var(--ft-red);padding:16px 16px 12px;position:sticky;top:0;z-index:100}
+.ft-header h1{font-size:20px;font-weight:800;letter-spacing:-.5px;color:#fff;text-align:center;text-transform:uppercase}
+.ft-header p{font-size:10px;color:rgba(255,255,255,.6);text-align:center;margin-top:2px;letter-spacing:.5px}
+.ft-nav{display:flex;overflow-x:auto;gap:4px;padding:10px 12px;background:var(--surface-1);border-bottom:1px solid var(--border);scrollbar-width:none;position:sticky;top:69px;z-index:99}
+.ft-nav::-webkit-scrollbar{display:none}
+.ft-tab{flex-shrink:0;padding:8px 14px;border-radius:var(--radius-full);font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;border:1px solid var(--border-mid);background:var(--surface-2);color:var(--text-2);transition:all .2s;white-space:nowrap;user-select:none}
+.ft-tab.active{background:var(--ft-teal);color:#fff;border-color:var(--ft-teal)}
+.ft-tab:active{transform:scale(.97)}
+.ft-section{display:none;padding:14px 12px 100px}
+.ft-section.active{display:block}
+.section-title{background:var(--ft-teal);color:#fff;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;padding:10px 14px;border-radius:var(--radius-md) var(--radius-md) 0 0;border-left:4px solid var(--ft-red)}
+.ft-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px}
+.ft-card-body{padding:12px}
+.ft-table{width:100%;border-collapse:collapse;font-size:12px}
+.ft-table thead th{background:var(--ft-blue);color:#fff;padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:left}
+.ft-table thead th:not(:first-child){text-align:right}
+.ft-table tbody tr:nth-child(even) td{background:var(--ft-blue-row)}
+.ft-table tbody tr:nth-child(odd) td{background:transparent}
+.ft-table tbody tr:hover td{background:rgba(77,168,255,.08)}
+.ft-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-1)}
+.ft-table td:not(:first-child){text-align:right}
+.ft-table tfoot td{padding:8px;font-weight:700;font-size:12px;background:var(--ft-teal-hdr)!important;color:#fff;border-top:2px solid var(--ft-teal)}
+.ft-table tfoot td:not(:first-child){text-align:right}
+.ft-input{background:var(--surface-3);border:1px solid var(--border-mid);color:var(--text-1);border-radius:var(--radius-sm);padding:7px 10px;font-size:16px;width:100%;font-family:var(--font);outline:none;-webkit-appearance:none}
+.ft-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.ft-input.input-num{text-align:right;font-variant-numeric:tabular-nums;max-width:110px}
+.ft-input.input-sm{max-width:80px;font-size:14px;padding:6px 8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--radius-full);font-size:13px;font-weight:700;cursor:pointer;border:none;font-family:var(--font);transition:all .18s;user-select:none;min-height:40px}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--ft-teal);color:#fff}
+.btn-primary:hover{background:#1f7f7f}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+.btn-neutral{background:var(--surface-3);color:var(--text-2);border:1px solid var(--border-mid)}
+.btn-sm{padding:6px 12px;font-size:11px;min-height:30px}
+.btn-icon{width:32px;height:32px;border-radius:var(--radius-sm);padding:0;font-size:15px}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-row.three{grid-template-columns:2fr 1fr 1fr}
+.form-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-2);margin-bottom:4px;display:block}
+.ft-custo-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-top:10px}
+.ft-custo-label{background:var(--ft-teal-hdr);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--border);letter-spacing:.3px}
+.ft-custo-value{background:var(--surface-2);padding:10px 12px;font-size:14px;font-weight:700;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+.ft-custo-value.green{color:var(--green)}.ft-custo-value.red{color:var(--red)}.ft-custo-value.blue{color:var(--accent)}.ft-custo-value.yellow{color:var(--yellow)}
+.select-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.ft-select{background:var(--surface-2);border:1px solid var(--border-mid);color:var(--text-1);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;font-family:var(--font);flex:1;min-width:120px;outline:none;cursor:pointer}
+.ft-select:focus{border-color:var(--accent)}
+.cardapio-pizza-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px;overflow:hidden}
+.cardapio-pizza-header{background:linear-gradient(135deg,var(--ft-blue),var(--ft-teal-hdr));padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.cardapio-pizza-header span{font-weight:800;font-size:14px;color:#fff;text-transform:uppercase}
+.cardapio-sizes{display:grid;grid-template-columns:repeat(3,1fr)}
+.cardapio-size-cell{padding:8px 6px;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.cardapio-size-cell:last-child{border-right:none}
+.cardapio-size-label{font-size:10px;color:var(--text-2);font-weight:700;text-transform:uppercase}
+.cardapio-size-price{font-size:15px;font-weight:800;color:var(--green);margin-top:2px}
+.cardapio-size-lucro{font-size:9px;color:var(--text-3);margin-top:1px}
+.cardapio-size-cell.no-price .cardapio-size-price{color:var(--text-3);font-size:11px}
+.custo-fixo-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.cf-kpi{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px}
+.cf-kpi-label{font-size:10px;color:var(--text-2);text-transform:uppercase;font-weight:700;letter-spacing:.3px}
+.cf-kpi-value{font-size:18px;font-weight:800;color:var(--accent);margin-top:4px;font-variant-numeric:tabular-nums}
+.cf-kpi-value.green{color:var(--green)}.cf-kpi-value.red{color:var(--red)}.cf-kpi-value.yellow{color:var(--yellow)}
+.cf-kpi-sub{font-size:10px;color:var(--text-3);margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:var(--radius-full);font-size:10px;font-weight:700;text-transform:uppercase}
+.badge-teal{background:rgba(26,107,107,.3);color:#4ecdc4;border:1px solid rgba(78,205,196,.3)}
+.badge-blue{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(77,168,255,.3)}
+.badge-green{background:var(--green-dim);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.badge-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.preparo-resumo{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:14px}
+.preparo-resumo h3{font-size:12px;font-weight:800;text-transform:uppercase;color:var(--text-2);letter-spacing:.5px;margin-bottom:10px}
+.preparo-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.preparo-item:last-child{border-bottom:none}
+.preparo-item-nome{color:var(--text-1)}
+.preparo-item-qtd{font-weight:800;color:var(--yellow);font-variant-numeric:tabular-nums}
+/* FIX: position:relative no pai para .ft-modal-close funcionar */
+.ft-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:flex-end;justify-content:center}
+.ft-overlay.open{display:flex}
+.ft-modal{position:relative;background:var(--surface-1);border:1px solid var(--border-mid);border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:20px 16px 36px;width:100%;max-width:480px;max-height:90dvh;overflow-y:auto}
+.ft-modal-title{font-size:16px;font-weight:800;color:var(--text-1);margin-bottom:16px;text-align:center;text-transform:uppercase}
+.ft-modal-close{position:absolute;top:14px;right:14px;background:var(--surface-3);border:1px solid var(--border-mid);color:var(--text-2);width:32px;height:32px;border-radius:var(--radius-full);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#ft-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ft-teal);color:#fff;padding:10px 20px;border-radius:var(--radius-full);font-size:13px;font-weight:700;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+#ft-toast.show{opacity:1}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-3)}
+.empty-state .empty-icon{font-size:40px;margin-bottom:10px}
+.empty-state p{font-size:13px}
+.text-accent{color:var(--accent)}.text-green{color:var(--green)}.font-mono{font-variant-numeric:tabular-nums}
+.mt-8{margin-top:8px}.mb-8{margin-bottom:8px}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+
+/* -- HELP CARDS v1.2.0 -- */
+.help-card{border-radius:var(--radius-md);overflow:hidden;margin-bottom:14px;border:1px solid transparent}
+.help-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;user-select:none;gap:8px}
+.help-header-left{display:flex;align-items:center;gap:10px}
+.help-icon{font-size:18px;flex-shrink:0;line-height:1}
+.help-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.help-sub{font-size:10px;opacity:.7;margin-top:2px}
+.help-chevron{font-size:11px;opacity:.55;transition:transform .22s;flex-shrink:0}
+.help-card.open .help-chevron{transform:rotate(180deg)}
+.help-body{display:none;padding:4px 14px 14px}
+.help-card.open .help-body{display:block}
+.help-steps{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.help-step{display:flex;gap:10px;align-items:flex-start}
+.help-num{width:22px;height:22px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:2px}
+.help-text{font-size:12px;line-height:1.55;color:var(--text-2)}
+.help-text b,.help-text strong{color:var(--text-1)}
+.help-tip{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:var(--radius-sm);margin-top:8px;font-size:11px;line-height:1.5;color:var(--text-2)}
+.help-tip-ico{font-size:13px;flex-shrink:0;margin-top:1px}
+.help-hr{height:1px;margin:10px 0}
+.help-card.c-teal{background:rgba(13,79,79,.18);border-color:rgba(26,107,107,.4)}
+.help-card.c-teal .help-header{background:rgba(13,79,79,.3)}
+.help-card.c-teal .help-label{color:#4ecdc4}
+.help-card.c-teal .help-num{background:rgba(26,107,107,.4);color:#4ecdc4}
+.help-card.c-teal .help-hr{background:rgba(26,107,107,.3)}
+.help-card.c-teal .help-tip{background:rgba(26,107,107,.15);border:1px solid rgba(26,107,107,.3)}
+.help-card.c-blue{background:rgba(26,74,138,.15);border-color:rgba(26,74,138,.45)}
+.help-card.c-blue .help-header{background:rgba(26,74,138,.25)}
+.help-card.c-blue .help-label{color:var(--accent)}
+.help-card.c-blue .help-num{background:rgba(26,74,138,.45);color:var(--accent)}
+.help-card.c-blue .help-hr{background:rgba(26,74,138,.3)}
+.help-card.c-blue .help-tip{background:rgba(77,168,255,.08);border:1px solid rgba(77,168,255,.2)}
+.help-card.c-green{background:rgba(52,211,153,.07);border-color:rgba(52,211,153,.28)}
+.help-card.c-green .help-header{background:rgba(52,211,153,.12)}
+.help-card.c-green .help-label{color:var(--green)}
+.help-card.c-green .help-num{background:rgba(52,211,153,.22);color:var(--green)}
+.help-card.c-green .help-hr{background:rgba(52,211,153,.2)}
+.help-card.c-green .help-tip{background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2)}
+.help-card.c-red{background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.28)}
+.help-card.c-red .help-header{background:rgba(248,113,113,.13)}
+.help-card.c-red .help-label{color:var(--red)}
+.help-card.c-red .help-num{background:rgba(248,113,113,.22);color:var(--red)}
+.help-card.c-red .help-hr{background:rgba(248,113,113,.2)}
+.help-card.c-red .help-tip{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2)}
+.help-card.c-yellow{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.28)}
+.help-card.c-yellow .help-header{background:rgba(251,191,36,.12)}
+.help-card.c-yellow .help-label{color:var(--yellow)}
+.help-card.c-yellow .help-num{background:rgba(251,191,36,.2);color:var(--yellow)}
+.help-card.c-yellow .help-hr{background:rgba(251,191,36,.2)}
+.help-card.c-yellow .help-tip{background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2)}
+</style>
+</head>
+<body>
+
+<header class="ft-header">
+  <h1>🍕 Ficha Técnica Pro</h1>
+  <p>PRECIFICAÇÃO AUTOMÁTICA · ANÁLISE DE CUSTOS</p>
+</header>
+
+<nav class="ft-nav">
+  <button class="ft-tab active" data-tab="cadastro">📦 Cadastro</button>
+  <button class="ft-tab" data-tab="ficha">📋 Ficha Técnica</button>
+  <button class="ft-tab" data-tab="cardapio">🍕 Cardápio</button>
+  <button class="ft-tab" data-tab="custos">💰 Custos Fixos</button>
+  <button class="ft-tab" data-tab="preparo">🔪 Preparo</button>
+</nav>
+
+<div id="ft-toast"></div>
+
+<!-- MODAL ADICIONAR INGREDIENTE (FIX #2 — substitui prompt()) -->
+<div class="ft-overlay" id="overlay-add-ing">
+  <div class="ft-modal">
+    <button class="ft-modal-close" onclick="FTModal.fechar()">✕</button>
+    <div class="ft-modal-title">Adicionar Ingrediente</div>
+    <div style="margin-bottom:12px">
+      <label class="form-label">Ingrediente</label>
+      <select id="modal-ing-select" class="ft-select" style="width:100%" onchange="FTModal.atualizarLabel()"></select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="form-label" id="modal-ing-peso-label">Peso na pizza (g)</label>
+      <input id="modal-ing-qtd" class="ft-input input-num" type="number" step="1" min="0"
+        placeholder="0" inputmode="decimal" style="max-width:100%">
+    </div>
+    <div class="btn-group" style="margin-top:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="FTModal.confirmar()">Adicionar</button>
+      <button class="btn btn-neutral" onclick="FTModal.fechar()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ABA 1 — CADASTRO -->
+<section class="ft-section active" id="tab-cadastro">
+<div class="help-card c-teal" id="help-cadastro">
+  <div class="help-header" onclick="FTHelp.toggle('help-cadastro')">
+    <div class="help-header-left"><span class="help-icon">&#128218;</span>
+      <div><div class="help-label">Como usar &middot; Cadastro de Ingredientes</div>
+      <div class="help-sub" id="help-cadastro-sub">Toque para ver as instru&#231;&#245;es</div></div>
+    </div><span class="help-chevron">&#9660;</span>
+  </div>
+  <div class="help-body">
+    <div class="help-steps">
+      <div class="help-step"><div class="help-num">1</div><div class="help-text"><b>Comece aqui.</b> Antes de criar fichas, cadastre todos os ingredientes: farinha, queijo, molho, embalagens etc.</div></div>
+      <div class="help-step"><div class="help-num">2</div><div class="help-text"><b>Preencha os 3 campos:</b> nome, valor pago pela embalagem (ex: R$&nbsp;32,00) e peso da embalagem em gramas (ex: 1000 para 1&nbsp;kg).</div></div>
+      <div class="help-step"><div class="help-num">3</div><div class="help-text"><b>Tipo de medida:</b> <em>Por peso</em> para ingredientes em kg/g. <em>Por unidade</em> para caixas &mdash; coloque o valor por pe&#231;a e "1" no campo peso.</div></div>
+      <div class="help-step"><div class="help-num">4</div><div class="help-text"><b>O sistema calcula automaticamente</b> o custo por kg ou por unidade, alimentando todas as fichas t&#233;cnicas em tempo real.</div></div>
+      <div class="help-step"><div class="help-num">5</div><div class="help-text"><b>Quando o pre&#231;o mudar,</b> remova e recadastre com o novo valor &mdash; todas as fichas s&#227;o atualizadas automaticamente.</div></div>
+    </div>
+    <div class="help-hr"></div>
+    <div class="help-tip"><span class="help-tip-ico">&#128161;</span><span><b>Caixa:</b> Caixa 35&nbsp;cm custa R$&nbsp;1,80 &rarr; valor&nbsp;pago=1,80 &middot; peso=1 &middot; tipo=Por&nbsp;unidade.</span></div>
+    <div class="help-tip" style="margin-top:6px"><span class="help-tip-ico">&#9888;&#65039;</span><span>Remover um ingrediente aqui remove-o de <b>todas as fichas t&#233;cnicas</b>.</span></div>
+  </div>
+</div>
+
+  <div class="ft-card">
+    <div class="section-title">Cadastro de Ingredientes</div>
+    <div class="ft-card-body">
+      <div class="form-row three">
+        <div>
+          <label class="form-label">Ingrediente</label>
+          <input id="cad-nome" class="ft-input" type="text" placeholder="Nome do ingrediente">
+        </div>
+        <div>
+          <label class="form-label">Valor pago (R$)</label>
+          <input id="cad-valor" class="ft-input input-num" type="number" step="0.01" min="0" placeholder="0,00" inputmode="decimal">
+        </div>
+        <div>
+          <label class="form-label">Peso embal. (g)</label>
+          <input id="cad-peso" class="ft-input input-num" type="number" step="1" min="0" placeholder="1000" inputmode="decimal">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label class="form-label">Tipo de medida</label>
+        <div style="display:flex;gap:14px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="cad-tipo" id="cad-tipo-peso" value="peso" checked> Por peso (g/kg)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="cad-tipo" id="cad-tipo-unidade" value="unidade"> Por unidade (cx, un)
+          </label>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-cad-add" onclick="FT.cadastro.adicionar()">+ Adicionar</button>
+      </div>
+    </div>
+  </div>
+  <div class="ft-card">
+    <div class="section-title">Lista de Ingredientes</div>
+    <div style="overflow-x:auto">
+      <table class="ft-table">
+        <thead>
+          <tr>
+            <th style="min-width:140px">Ingrediente</th>
+            <th>Valor Pago</th>
+            <th>Embalagem</th>
+            <th>R$/kg ou un.</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ingredientes">
+          <tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📦</div><p>Nenhum ingrediente cadastrado</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ABA 2 — FICHA TÉCNICA -->
+<section class="ft-section" id="tab-ficha">
+<div class="help-card c-blue" id="help-ficha">
+  <div class="help-header" onclick="FTHelp.toggle('help-ficha')">
+    <div class="help-header-left"><span class="help-icon">&#128203;</span>
+      <div><div class="help-label">Como usar &middot; Ficha T&#233;cnica</div>
+      <div class="help-sub" id="help-ficha-sub">Precifica&#231;&#227;o autom&#225;tica por tamanho</div></div>
+    </div><span class="help-chevron">&#9660;</span>
+  </div>
+  <div class="help-body">
+    <div class="help-steps">
+      <div class="help-step"><div class="help-num">1</div><div class="help-text"><b>Crie uma pizza</b> clicando em <em>+&nbsp;Nova&nbsp;Pizza</em> e d&#234; o nome do sabor.</div></div>
+      <div class="help-step"><div class="help-num">2</div><div class="help-text"><b>Escolha o tamanho</b> (25 a 75&nbsp;cm). Cada tamanho tem sua pr&#243;pria ficha com pesos e pre&#231;o independentes.</div></div>
+      <div class="help-step"><div class="help-num">3</div><div class="help-text"><b>Adicione ingredientes</b> com <em>+&nbsp;Ingrediente</em>. Selecione no modal e informe o peso em gramas ou quantidade de unidades.</div></div>
+      <div class="help-step"><div class="help-num">4</div><div class="help-text"><b>Ajuste os pesos</b> na tabela &mdash; o custo &#233; recalculado em tempo real, sem precisar salvar.</div></div>
+      <div class="help-step"><div class="help-num">5</div><div class="help-text"><b>Defina o Pre&#231;o de Venda</b> (campo amarelo). O sistema calcula Lucro Bruto e Margem&nbsp;% com c&#243;digo de cores: <span style="color:var(--green)">verde&nbsp;&#8805;30%</span> &middot; <span style="color:var(--yellow)">amarelo 15-29%</span> &middot; <span style="color:var(--red)">vermelho&lt;15%</span>.</div></div>
+      <div class="help-step"><div class="help-num">6</div><div class="help-text"><b>O custo fixo rateado j&#225; est&#225; inclu&#237;do</b> automaticamente via aba Custos Fixos. Nenhuma soma manual necess&#225;ria.</div></div>
+    </div>
+    <div class="help-hr"></div>
+    <div class="help-tip"><span class="help-tip-ico">&#128161;</span><span><b>Exemplo:</b> Mussarela 35&nbsp;cm usa 350&nbsp;g de queijo @ R$&nbsp;32,00/kg &rarr; <b>R$&nbsp;11,20</b> s&#243; de queijo.</span></div>
+    <div class="help-tip" style="margin-top:6px"><span class="help-tip-ico">&#128260;</span><span>Repita para cada tamanho. Cada um tem pesos e pre&#231;o de venda pr&#243;prios.</span></div>
+  </div>
+</div>
+
+  <div class="ft-card">
+    <div class="section-title">Selecionar / Criar Ficha</div>
+    <div class="ft-card-body">
+      <div class="select-row">
+        <select id="sel-pizza" class="ft-select" onchange="FT.ficha.selecionarPizza()">
+          <option value="">— Selecione a pizza —</option>
+        </select>
+        <select id="sel-tamanho" class="ft-select" onchange="FT.ficha.renderFicha()" style="max-width:110px">
+          <option value="25">25 cm</option>
+          <option value="35" selected>35 cm</option>
+          <option value="45">45 cm</option>
+          <option value="55">55 cm</option>
+          <option value="65">65 cm</option>
+          <option value="75">75 cm</option>
+        </select>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="FT.ficha.novaPizza()">+ Nova Pizza</button>
+        <button class="btn btn-neutral btn-sm" onclick="FT.ficha.renomear()">✏️ Renomear</button>
+        <button class="btn btn-danger btn-sm" onclick="FT.ficha.excluirPizza()">🗑 Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ft-card" id="ficha-ingredientes-card" style="display:none">
+    <div class="section-title" id="ficha-card-title">FICHA — ? — ?cm</div>
+    <div style="overflow-x:auto">
+      <table class="ft-table">
+        <thead>
+          <tr>
+            <th style="min-width:130px">Ingrediente</th>
+            <th>R$/kg·un</th>
+            <th id="th-peso-label">Peso/Qtd</th>
+            <th>Total R$</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ficha"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">Custo de Ingredientes</td>
+            <td id="ft-peso-total" class="font-mono">—</td>
+            <td id="ft-custo-ingr" class="font-mono text-accent">—</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="ft-card-body">
+      <div class="btn-group mb-8">
+        <button class="btn btn-primary btn-sm" onclick="FT.ficha.adicionarIngrediente()">+ Ingrediente</button>
+      </div>
+    </div>
+    <div class="ft-card-body" style="padding-top:0">
+      <div class="flex-between" style="margin-bottom:6px">
+        <span class="form-label" style="margin:0">Custo fixo rateado (automático)</span>
+        <span id="ft-custo-fixo-badge" class="badge badge-blue">R$ 0,00</span>
+      </div>
+    </div>
+    <div class="ft-card-body" style="padding-top:0">
+      <div class="ft-custo-grid">
+        <div class="ft-custo-label">Custo do Produto</div>
+        <div class="ft-custo-value blue" id="res-custo">R$ —</div>
+        <div class="ft-custo-label">Peso Total</div>
+        <div class="ft-custo-value" id="res-peso">— g</div>
+        <div class="ft-custo-label">Preço de Venda</div>
+        <div class="ft-custo-value yellow" style="padding:4px 8px">
+          <input id="res-preco-input" class="ft-input input-num" type="number" step="0.50" min="0"
+            placeholder="0,00" inputmode="decimal"
+            style="max-width:100%;background:var(--surface-3)" oninput="FT.ficha.atualizarPreco()">
+        </div>
+        <div class="ft-custo-label">Lucro Bruto</div>
+        <div class="ft-custo-value green" id="res-lucro">R$ —</div>
+        <div class="ft-custo-label">Margem %</div>
+        <div class="ft-custo-value" id="res-margem">—%</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ficha-empty" class="empty-state">
+    <div class="empty-icon">📋</div>
+    <p>Selecione ou crie uma pizza para editar a ficha técnica</p>
+  </div>
+</section>
+
+<!-- ABA 3 — CARDÁPIO -->
+<section class="ft-section" id="tab-cardapio">
+<div class="help-card c-green" id="help-cardapio">
+  <div class="help-header" onclick="FTHelp.toggle('help-cardapio')">
+    <div class="help-header-left"><span class="help-icon">&#127829;</span>
+      <div><div class="help-label">Como usar &middot; Card&#225;pio</div>
+      <div class="help-sub" id="help-cardapio-sub">Vis&#227;o geral de pre&#231;os e margens</div></div>
+    </div><span class="help-chevron">&#9660;</span>
+  </div>
+  <div class="help-body">
+    <div class="help-steps">
+      <div class="help-step"><div class="help-num">1</div><div class="help-text"><b>Esta aba &#233; gerada automaticamente.</b> N&#227;o h&#225; nada para preencher &mdash; os pre&#231;os v&#234;m das Fichas T&#233;cnicas.</div></div>
+      <div class="help-step"><div class="help-num">2</div><div class="help-text"><b>Para cada pizza e tamanho</b> voc&#234; v&#234; pre&#231;o, lucro bruto e margem&nbsp;%: <span style="color:var(--green)">verde=saud&#225;vel</span> &middot; <span style="color:var(--yellow)">amarelo=aten&#231;&#227;o</span> &middot; <span style="color:var(--red)">vermelho=cr&#237;tico</span>.</div></div>
+      <div class="help-step"><div class="help-num">3</div><div class="help-text"><b>Tamanhos com "&#8212;"</b> n&#227;o t&#234;m ficha. V&#225; &#224; aba Ficha T&#233;cnica, selecione a pizza e o tamanho para preencher.</div></div>
+      <div class="help-step"><div class="help-num">4</div><div class="help-text"><b>Atualiza&#231;&#245;es autom&#225;ticas:</b> qualquer altera&#231;&#227;o na Ficha T&#233;cnica reflete aqui em &#8804;&nbsp;400&nbsp;ms.</div></div>
+    </div>
+    <div class="help-hr"></div>
+    <div class="help-tip"><span class="help-tip-ico">&#128202;</span><span><b>Legenda:</b> Verde&nbsp;&#8805;30% &middot; Amarelo 15-29% &middot; Vermelho&lt;15%. A margem j&#225; inclui o custo fixo rateado.</span></div>
+  </div>
+</div>
+
+  <div class="ft-card" style="margin-bottom:14px">
+    <div class="section-title">Cardápio de Pizzas</div>
+    <div class="ft-card-body" style="padding:10px 14px">
+      <p style="font-size:11px;color:var(--yellow)">⚠️ Preços calculados automaticamente via Ficha Técnica. Para alterar, edite a ficha de cada pizza.</p>
+    </div>
+  </div>
+  <div id="cardapio-container">
+    <div class="empty-state"><div class="empty-icon">🍕</div><p>Nenhuma pizza cadastrada</p></div>
+  </div>
+</section>
+
+<!-- ABA 4 — CUSTOS FIXOS -->
+<section class="ft-section" id="tab-custos">
+<div class="help-card c-red" id="help-custos">
+  <div class="help-header" onclick="FTHelp.toggle('help-custos')">
+    <div class="help-header-left"><span class="help-icon">&#128176;</span>
+      <div><div class="help-label">Como usar &middot; Custos Fixos</div>
+      <div class="help-sub" id="help-custos-sub">Rateio autom&#225;tico nas fichas t&#233;cnicas</div></div>
+    </div><span class="help-chevron">&#9660;</span>
+  </div>
+  <div class="help-body">
+    <div class="help-steps">
+      <div class="help-step"><div class="help-num">1</div><div class="help-text"><b>Cadastre todos os custos fixos mensais:</b> aluguel, luz, &#225;gua, internet, sal&#225;rios, pr&#243;-labore etc. S&#227;o despesas pagas independentemente do volume de vendas.</div></div>
+      <div class="help-step"><div class="help-num">2</div><div class="help-text"><b>Informe quantas pizzas voc&#234; vende por m&#234;s.</b> O sistema divide o total de custos por esse n&#250;mero &rarr; <em>custo fixo por pizza</em>.</div></div>
+      <div class="help-step"><div class="help-num">3</div><div class="help-text"><b>Esse valor entra automaticamente</b> em cada Ficha T&#233;cnica como "Custo fixo rateado". Nenhuma soma manual necess&#225;ria.</div></div>
+      <div class="help-step"><div class="help-num">4</div><div class="help-text"><b>"Pizzas/dia p/ cobrir"</b> = ponto de equil&#237;brio di&#225;rio: quantas pizzas precisam ser vendidas por dia s&#243; para cobrir os custos fixos.</div></div>
+    </div>
+    <div class="help-hr"></div>
+    <div class="help-tip"><span class="help-tip-ico">&#128161;</span><span><b>Exemplo:</b> R$&nbsp;8.394 &#247; 1.000&nbsp;pizzas/m&#234;s = <b>R$&nbsp;8,39</b> de custo fixo por pizza em cada ficha.</span></div>
+    <div class="help-tip" style="margin-top:6px"><span class="help-tip-ico">&#127919;</span><span>Custo fixo/dia R$&nbsp;419,70 + ticket m&#233;dio R$&nbsp;39 &rarr; vender <b>&#8776;10,8&nbsp;pizzas/dia</b> para cobrir os fixos.</span></div>
+  </div>
+</div>
+
+  <div class="custo-fixo-summary">
+    <div class="cf-kpi">
+      <div class="cf-kpi-label">Total Custos Fixos</div>
+      <div class="cf-kpi-value red" id="cf-total">R$ 0,00</div>
+    </div>
+    <div class="cf-kpi">
+      <div class="cf-kpi-label">Custo Fixo / Pizza</div>
+      <div class="cf-kpi-value blue" id="cf-por-pizza">R$ 0,00</div>
+    </div>
+    <div class="cf-kpi">
+      <div class="cf-kpi-label">Pizzas/dia p/ cobrir</div>
+      <div class="cf-kpi-value yellow" id="cf-pizzas-dia">0</div>
+      <div class="cf-kpi-sub">Baseado na média do cardápio</div>
+    </div>
+    <div class="cf-kpi">
+      <div class="cf-kpi-label">Custo Fixo / dia</div>
+      <div class="cf-kpi-value green" id="cf-por-dia">R$ 0,00</div>
+    </div>
+  </div>
+  <div class="ft-card">
+    <div class="section-title">Configurações</div>
+    <div class="ft-card-body">
+      <div class="form-row">
+        <div>
+          <label class="form-label">Pizzas vendidas / mês</label>
+          <input id="cf-qtd-pizzas" class="ft-input input-num" type="number" min="1" value="1000" oninput="FT.custos.recalcular()" inputmode="numeric">
+        </div>
+        <div>
+          <label class="form-label">Dias trabalhados / mês</label>
+          <input id="cf-dias" class="ft-input input-num" type="number" min="1" value="20" oninput="FT.custos.recalcular()" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ft-card">
+    <div class="section-title">Custos Fixos Mensais</div>
+    <div class="ft-card-body">
+      <div class="form-row">
+        <div>
+          <label class="form-label">Descrição</label>
+          <input id="cf-nome" class="ft-input" type="text" placeholder="Ex: Aluguel">
+        </div>
+        <div>
+          <label class="form-label">Valor (R$)</label>
+          <input id="cf-valor" class="ft-input input-num" type="number" step="0.01" placeholder="0,00" inputmode="decimal">
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="FT.custos.adicionar()">+ Adicionar Custo</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="ft-table">
+        <thead>
+          <tr><th>Descrição</th><th>Valor</th><th style="width:40px"></th></tr>
+        </thead>
+        <tbody id="tbody-custos">
+          <tr><td colspan="3"><div class="empty-state"><div class="empty-icon">💰</div><p>Nenhum custo cadastrado</p></div></td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL DOS CUSTOS</td>
+            <td id="cf-total-footer" class="font-mono">R$ 0,00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ABA 5 — PREPARO -->
+<section class="ft-section" id="tab-preparo">
+<div class="help-card c-yellow" id="help-preparo">
+  <div class="help-header" onclick="FTHelp.toggle('help-preparo')">
+    <div class="help-header-left"><span class="help-icon">&#128298;</span>
+      <div><div class="help-label">Como usar &middot; Preparo Antecipado</div>
+      <div class="help-sub" id="help-preparo-sub">Calcule os ingredientes do dia em segundos</div></div>
+    </div><span class="help-chevron">&#9660;</span>
+  </div>
+  <div class="help-body">
+    <div class="help-steps">
+      <div class="help-step"><div class="help-num">1</div><div class="help-text"><b>No in&#237;cio do dia,</b> informe quantas pizzas de cada sabor e tamanho ser&#227;o produzidas. Aparecem apenas os tamanhos com ficha t&#233;cnica cadastrada.</div></div>
+      <div class="help-step"><div class="help-num">2</div><div class="help-text"><b>Toque em "Calcular Preparo".</b> O sistema consolida todos os ingredientes necess&#225;rios, somando por pizza e tamanho.</div></div>
+      <div class="help-step"><div class="help-num">3</div><div class="help-text"><b>O resultado</b> mostra cada ingrediente com o total em gramas, kg ou unidades &mdash; pronto para pesar e separar antes da produ&#231;&#227;o.</div></div>
+      <div class="help-step"><div class="help-num">4</div><div class="help-text">Use <b>"Limpar"</b> para resetar os campos e iniciar um novo planejamento.</div></div>
+    </div>
+    <div class="help-hr"></div>
+    <div class="help-tip"><span class="help-tip-ico">&#128640;</span><span><b>Exemplo:</b> 20&#215; Mussarela 35&nbsp;cm + 15&#215; Frango 35&nbsp;cm &rarr; lista consolidada com pesos exatos de cada ingrediente.</span></div>
+    <div class="help-tip" style="margin-top:6px"><span class="help-tip-ico">&#128204;</span><span>Para aparecer aqui, a pizza precisa ter ao menos um tamanho com ingredientes cadastrados na Ficha T&#233;cnica.</span></div>
+  </div>
+</div>
+
+  <div class="ft-card">
+    <div class="section-title">Planejamento de Produção do Dia</div>
+    <div class="ft-card-body">
+      <p style="font-size:12px;color:var(--text-2);margin-bottom:12px">Informe quantas pizzas de cada tipo/tamanho serão produzidas hoje. O sistema calculará automaticamente os ingredientes necessários.</p>
+      <div id="preparo-inputs-container"></div>
+      <div class="btn-group mt-8">
+        <button class="btn btn-primary btn-sm" onclick="FT.preparo.calcular()">🔪 Calcular Preparo</button>
+        <button class="btn btn-neutral btn-sm" onclick="FT.preparo.limpar()">✕ Limpar</button>
+      </div>
+    </div>
+  </div>
+  <div id="preparo-resultado" style="display:none">
+    <div class="preparo-resumo">
+      <h3>📋 Ingredientes Necessários</h3>
+      <div id="preparo-lista-ingredientes"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+// Constante global — usada por todos os módulos (FIX: evita redeclaração)
+const SIZES = ['25','35','45','55','65','75'];
+
+// ── ft-storage.js ──────────────────────────────────────
+const FTStorage = (() => {
+  const KEY = 'fichatecnica_v1';
+
+  function _defaultData() {
+    return {
+      ingredientes: [
+        {id:1, nome:'Massa de Pizza', valorPago:3.50, pesoEmbalagem:1000, tipo:'peso'},
+        {id:2, nome:'Molho Pronto', valorPago:8.00, pesoEmbalagem:2000, tipo:'peso'},
+        {id:3, nome:'Mussarela', valorPago:32.00, pesoEmbalagem:1000, tipo:'peso'},
+        {id:4, nome:'Tomate', valorPago:6.00, pesoEmbalagem:1000, tipo:'peso'},
+        {id:5, nome:'Orégano', valorPago:5.00, pesoEmbalagem:100, tipo:'peso'},
+        {id:6, nome:'Azeitonas', valorPago:12.00, pesoEmbalagem:500, tipo:'peso'},
+        {id:7, nome:'Caixa 25', valorPago:1.20, pesoEmbalagem:1, tipo:'unidade'},
+        {id:8, nome:'Caixa 35', valorPago:1.80, pesoEmbalagem:1, tipo:'unidade'},
+        {id:9, nome:'Caixa 45', valorPago:2.20, pesoEmbalagem:1, tipo:'unidade'},
+        {id:10, nome:'Caixa 55', valorPago:2.80, pesoEmbalagem:1, tipo:'unidade'},
+        {id:11, nome:'Frango Cozido', valorPago:18.00, pesoEmbalagem:1000, tipo:'peso'},
+        {id:12, nome:'Catupiry', valorPago:28.00, pesoEmbalagem:1000, tipo:'peso'},
+        {id:13, nome:'Bacon', valorPago:38.00, pesoEmbalagem:1000, tipo:'peso'},
+        {id:14, nome:'Calabresa', valorPago:22.00, pesoEmbalagem:1000, tipo:'peso'},
+      ],
+      pizzas: [
+        {id:1, nome:'Mussarela', fichas:{
+          '25':{ingredientes:[{id:1,qtd:200},{id:2,qtd:60},{id:3,qtd:200},{id:4,qtd:50},{id:5,qtd:1},{id:6,qtd:15},{id:7,qtd:1}], preco:25},
+          '35':{ingredientes:[{id:1,qtd:350},{id:2,qtd:80},{id:3,qtd:350},{id:4,qtd:80},{id:5,qtd:1},{id:6,qtd:20},{id:8,qtd:1}], preco:38},
+          '45':{ingredientes:[{id:1,qtd:500},{id:2,qtd:120},{id:3,qtd:500},{id:4,qtd:100},{id:5,qtd:2},{id:6,qtd:30},{id:9,qtd:1}], preco:55},
+          '55':{ingredientes:[], preco:0},'65':{ingredientes:[], preco:0},'75':{ingredientes:[], preco:0}
+        }},
+        {id:2, nome:'Frango com Catupiry', fichas:{
+          '25':{ingredientes:[{id:1,qtd:200},{id:2,qtd:60},{id:3,qtd:150},{id:11,qtd:150},{id:12,qtd:80},{id:5,qtd:1},{id:7,qtd:1}], preco:32},
+          '35':{ingredientes:[{id:1,qtd:350},{id:2,qtd:80},{id:3,qtd:200},{id:11,qtd:200},{id:12,qtd:100},{id:5,qtd:1},{id:8,qtd:1}], preco:48},
+          '45':{ingredientes:[], preco:0},'55':{ingredientes:[], preco:0},'65':{ingredientes:[], preco:0},'75':{ingredientes:[], preco:0}
+        }},
+      ],
+      custosFixos: [
+        {id:1,nome:'Água',valor:120},{id:2,nome:'Luz',valor:350},{id:3,nome:'Telefone',valor:60},
+        {id:4,nome:'Motoboy',valor:1120},{id:5,nome:'Funcionários',valor:1424},
+        {id:6,nome:'Pró-Labore',valor:4000},{id:7,nome:'Internet',valor:100},{id:8,nome:'Processo',valor:500},
+      ],
+      config:{pizzasVendidasMes:1000, diasTrabalhados:20}
+    };
+  }
+
+  // FIX: valida estrutura + migra campos tipo e peso→qtd
+  function _validar(data) {
+    const def = _defaultData();
+    if (!data || typeof data !== 'object') return def;
+    if (!Array.isArray(data.ingredientes)) data.ingredientes = def.ingredientes;
+    if (!Array.isArray(data.pizzas))       data.pizzas       = def.pizzas;
+    if (!Array.isArray(data.custosFixos))  data.custosFixos  = def.custosFixos;
+    if (!data.config || typeof data.config !== 'object') data.config = def.config;
+    data.config.pizzasVendidasMes = data.config.pizzasVendidasMes || 1000;
+    data.config.diasTrabalhados   = data.config.diasTrabalhados   || 20;
+    // Migra campo tipo ausente (versão anterior usava sentinel pesoEmbalagem===1)
+    data.ingredientes.forEach(ing => {
+      if (!ing.tipo) ing.tipo = (ing.pesoEmbalagem === 1) ? 'unidade' : 'peso';
+    });
+    // Migra campo peso → qtd nas fichas
+    data.pizzas.forEach(p => {
+      Object.values(p.fichas || {}).forEach(f => {
+        (f.ingredientes || []).forEach(fi => {
+          if (fi.peso !== undefined && fi.qtd === undefined) { fi.qtd = fi.peso; delete fi.peso; }
+        });
+      });
+    });
+    return data;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      return _validar(raw ? JSON.parse(raw) : null);
+    } catch(e) { return _defaultData(); }
+  }
+
+  function save(d) {
+    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch(e) { console.error('[FTStorage]', e); }
+  }
+
+  return { load, save };
+})();
+
+// ── ft-calc.js ─────────────────────────────────────────
+const FTCalc = (() => {
+  const isUnidade = ing => ing.tipo === 'unidade';
+
+  function valorUnitario(ing) {
+    if (!ing.pesoEmbalagem || ing.pesoEmbalagem <= 0) return 0;
+    return isUnidade(ing) ? ing.valorPago : ing.valorPago / ing.pesoEmbalagem;
+  }
+
+  function valorKgOuUn(ing) {
+    return isUnidade(ing) ? ing.valorPago : valorUnitario(ing) * 1000;
+  }
+
+  function custoIngrediente(ing, qtd) { return valorUnitario(ing) * qtd; }
+
+  function custoFixoPorPizza(cf, qtd) {
+    const t = cf.reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
+    return (qtd > 0) ? t / qtd : 0;
+  }
+
+  function custoFicha(ficha, imap, cf, qtdMes) {
+    let custoIngr = 0, pesoTotal = 0;
+    (ficha.ingredientes || []).forEach(fi => {
+      const ing = imap.get(fi.id);
+      if (!ing) return;
+      custoIngr += custoIngrediente(ing, fi.qtd);
+      if (!isUnidade(ing)) pesoTotal += fi.qtd;
+    });
+    const cfpp = custoFixoPorPizza(cf, qtdMes);
+    return { custoIngr, pesoTotal, custoFixo: cfpp, custoTotal: custoIngr + cfpp };
+  }
+
+  const lucroBruto = (p, c) => p - c;
+  const margem = (p, c) => (p > 0) ? ((p - c) / p) * 100 : 0;
+
+  return { isUnidade, valorKgOuUn, custoIngrediente, custoFicha, lucroBruto, margem };
+})();
+
+// ── ft-utils.js ────────────────────────────────────────
+const FTUtils = (() => {
+  const fmt  = n => 'R$ ' + (parseFloat(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtN = (n,d=0) => (parseFloat(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+  let _tt = null;
+  function toast(msg) {
+    const el = document.getElementById('ft-toast');
+    if (!el) return;
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // FIX: reduce em vez de spread — seguro para arrays grandes
+  function nextId(arr) {
+    return arr.length ? arr.reduce((m,x) => Math.max(m,x.id), 0) + 1 : 1;
+  }
+
+  function confirmar(msg, cb) { if (window.confirm(msg)) cb(); }
+
+  function debounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
+  return { fmt, fmtN, toast, nextId, confirmar, debounce };
+})();
+
+// ── estado global ──────────────────────────────────────
+let DATA = FTStorage.load();
+let _pizzaId = null;
+let _tam = '35';
+const _imap = () => new Map(DATA.ingredientes.map(i => [i.id, i]));
+const persistir = () => FTStorage.save(DATA);
+
+// ── ft-modal.js ────────────────────────────────────────
+const FTModal = (() => {
+  function abrirAddIngrediente() {
+    const sel = document.getElementById('modal-ing-select');
+    sel.innerHTML = [...DATA.ingredientes]
+      .sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR'))
+      .map(i => `<option value="${i.id}">${i.nome}</option>`).join('');
+    atualizarLabel();
+    document.getElementById('modal-ing-qtd').value = '';
+    document.getElementById('overlay-add-ing').classList.add('open');
+  }
+
+  function atualizarLabel() {
+    const id  = parseInt(document.getElementById('modal-ing-select').value);
+    const ing = DATA.ingredientes.find(i => i.id === id);
+    const el  = document.getElementById('modal-ing-peso-label');
+    if (el) el.textContent = ing && FTCalc.isUnidade(ing) ? 'Quantidade (unidades)' : 'Peso na pizza (g)';
+  }
+
+  function fechar() { document.getElementById('overlay-add-ing').classList.remove('open'); }
+
+  function confirmar() {
+    const id  = parseInt(document.getElementById('modal-ing-select').value);
+    const qtd = parseFloat(document.getElementById('modal-ing-qtd').value);
+    if (!id)              { FTUtils.toast('Selecione um ingrediente'); return; }
+    if (isNaN(qtd)||qtd<=0){ FTUtils.toast('Informe uma quantidade válida'); return; }
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza) return;
+    if (!pizza.fichas[_tam]) pizza.fichas[_tam] = {ingredientes:[],preco:0};
+    if (pizza.fichas[_tam].ingredientes.find(fi => fi.id === id)) { FTUtils.toast('Ingrediente já na ficha'); return; }
+    pizza.fichas[_tam].ingredientes.push({id, qtd});
+    persistir();
+    fichaModule.renderFicha();
+    const ing = DATA.ingredientes.find(i => i.id === id);
+    FTUtils.toast(`${ing?.nome || 'Ingrediente'} adicionado`);
+    fechar();
+  }
+
+  return { abrirAddIngrediente, atualizarLabel, fechar, confirmar };
+})();
+
+// ── ft-cadastro.js ─────────────────────────────────────
+const cadastroModule = (() => {
+  function render() {
+    const tbody = document.getElementById('tbody-ingredientes');
+    if (!tbody) return;
+    if (!DATA.ingredientes.length) {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📦</div><p>Nenhum ingrediente cadastrado</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = [...DATA.ingredientes]
+      .sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR'))
+      .map(ing => {
+        const v = FTCalc.valorKgOuUn(ing);
+        const vStr = FTCalc.isUnidade(ing) ? FTUtils.fmt(v)+'/un' : FTUtils.fmt(v)+'/kg';
+        const eStr = FTCalc.isUnidade(ing) ? '1 un' : FTUtils.fmtN(ing.pesoEmbalagem)+' g';
+        return `<tr>
+          <td><strong>${ing.nome}</strong></td>
+          <td class="font-mono">${FTUtils.fmt(ing.valorPago)}</td>
+          <td class="font-mono">${eStr}</td>
+          <td class="font-mono text-accent">${vStr}</td>
+          <td><button class="btn btn-danger btn-icon" onclick="FT.cadastro.remover(${ing.id})">🗑</button></td>
+        </tr>`;
+      }).join('');
+  }
+
+  function adicionar() {
+    const nome  = document.getElementById('cad-nome').value.trim().toUpperCase();
+    const valor = parseFloat(document.getElementById('cad-valor').value);
+    const peso  = parseFloat(document.getElementById('cad-peso').value);
+    const tipo  = document.querySelector('input[name="cad-tipo"]:checked')?.value || 'peso';
+    if (!nome)               { FTUtils.toast('Informe o nome'); return; }
+    if (isNaN(valor)||valor<0){ FTUtils.toast('Valor inválido'); return; }
+    if (isNaN(peso)||peso<=0) { FTUtils.toast('Peso/quantidade inválido'); return; }
+    if (DATA.ingredientes.find(i => i.nome === nome)) { FTUtils.toast('Ingrediente já cadastrado'); return; }
+    DATA.ingredientes.push({id:FTUtils.nextId(DATA.ingredientes), nome, valorPago:valor, pesoEmbalagem:peso, tipo});
+    persistir();
+    document.getElementById('cad-nome').value = '';
+    document.getElementById('cad-valor').value = '';
+    document.getElementById('cad-peso').value = '';
+    document.getElementById('cad-tipo-peso').checked = true;
+    render(); FTUtils.toast('Ingrediente adicionado!');
+  }
+
+  function remover(id) {
+    FTUtils.confirmar('Remover este ingrediente? Será removido de todas as fichas.', () => {
+      DATA.ingredientes = DATA.ingredientes.filter(i => i.id !== id);
+      DATA.pizzas.forEach(p => {
+        Object.values(p.fichas).forEach(f => { f.ingredientes = f.ingredientes.filter(fi => fi.id !== id); });
+      });
+      persistir(); render(); fichaModule.renderFicha(); FTUtils.toast('Removido');
+    });
+  }
+
+  return { render, adicionar, remover };
+})();
+
+// ── ft-ficha.js ────────────────────────────────────────
+const fichaModule = (() => {
+  // FIX: única fonte de verdade para select
+  function atualizarSelectPizzas() {
+    const sel = document.getElementById('sel-pizza');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Selecione a pizza —</option>' +
+      DATA.pizzas.map(p =>
+        `<option value="${p.id}"${p.id === _pizzaId ? ' selected' : ''}>${p.nome}</option>`
+      ).join('');
+  }
+
+  function selecionarPizza() {
+    _pizzaId = parseInt(document.getElementById('sel-pizza').value) || null;
+    renderFicha();
+  }
+
+  function renderFicha() {
+    _tam = document.getElementById('sel-tamanho')?.value || '35';
+    const card  = document.getElementById('ficha-ingredientes-card');
+    const empty = document.getElementById('ficha-empty');
+    if (!card||!empty) return;
+    if (!_pizzaId) { card.style.display='none'; empty.style.display='block'; return; }
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza) { card.style.display='none'; empty.style.display='block'; return; }
+    card.style.display = 'block'; empty.style.display = 'none';
+    document.getElementById('ficha-card-title').textContent = `FICHA — ${pizza.nome} — ${_tam}cm`;
+    const ficha = pizza.fichas[_tam] || {ingredientes:[],preco:0};
+    const imap  = _imap();
+    const tbody = document.getElementById('tbody-ficha');
+
+    if (!ficha.ingredientes.length) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:20px"><p>Nenhum ingrediente. Clique em + Ingrediente.</p></div></td></tr>`;
+    } else {
+      tbody.innerHTML = ficha.ingredientes.map((fi,idx) => {
+        const ing = imap.get(fi.id);
+        if (!ing) return '';
+        const vStr  = FTCalc.isUnidade(ing) ? FTUtils.fmt(FTCalc.valorKgOuUn(ing))+'/un' : FTUtils.fmt(FTCalc.valorKgOuUn(ing))+'/kg';
+        const custo = FTCalc.custoIngrediente(ing, fi.qtd);
+        // FIX: title dinâmico indica unidade de medida esperada
+        const title = FTCalc.isUnidade(ing) ? 'Quantidade (unidades)' : 'Peso em gramas';
+        return `<tr>
+          <td><strong>${ing.nome}</strong></td>
+          <td class="font-mono text-accent" style="font-size:11px">${vStr}</td>
+          <td><input type="number" class="ft-input input-sm" value="${fi.qtd}" min="0" step="1"
+            oninput="FT.ficha.atualizarQtd(${idx},this.value)" inputmode="decimal" title="${title}"></td>
+          <td class="font-mono text-green">${FTUtils.fmt(custo)}</td>
+          <td><button class="btn btn-danger btn-icon" style="width:28px;height:28px;font-size:13px"
+            onclick="FT.ficha.removerIngrediente(${idx})">✕</button></td>
+        </tr>`;
+      }).join('');
+    }
+    _totais(ficha, imap);
+  }
+
+  function _totais(ficha, imap) {
+    const {custoIngr,pesoTotal,custoFixo,custoTotal} =
+      FTCalc.custoFicha(ficha, imap, DATA.custosFixos, DATA.config.pizzasVendidasMes);
+    const set = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+    set('ft-peso-total', FTUtils.fmtN(pesoTotal)+' g');
+    set('ft-custo-ingr', FTUtils.fmt(custoIngr));
+    set('ft-custo-fixo-badge', FTUtils.fmt(custoFixo));
+    set('res-custo', FTUtils.fmt(custoTotal));
+    set('res-peso',  FTUtils.fmtN(pesoTotal)+' g');
+    const preco = parseFloat(ficha.preco)||0;
+    const inp = document.getElementById('res-preco-input');
+    if (inp) inp.value = preco||'';
+    _lucro(custoTotal, preco);
+  }
+
+  function _lucro(custoTotal, preco) {
+    const lucro = FTCalc.lucroBruto(preco, custoTotal);
+    const marg  = FTCalc.margem(preco, custoTotal);
+    const lEl   = document.getElementById('res-lucro');
+    const mEl   = document.getElementById('res-margem');
+    if (!lEl||!mEl) return;
+    lEl.textContent = FTUtils.fmt(lucro);
+    lEl.className   = 'ft-custo-value '+(lucro>=0?'green':'red');
+    mEl.textContent = FTUtils.fmtN(marg,1)+'%';
+    mEl.className   = 'ft-custo-value '+(marg>=30?'green':marg>=15?'yellow':'red');
+  }
+
+  function atualizarPreco() {
+    if (!_pizzaId) return;
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza) return;
+    if (!pizza.fichas[_tam]) pizza.fichas[_tam] = {ingredientes:[],preco:0};
+    const preco = parseFloat(document.getElementById('res-preco-input').value)||0;
+    pizza.fichas[_tam].preco = preco;
+    persistir();
+    const {custoTotal} = FTCalc.custoFicha(pizza.fichas[_tam], _imap(), DATA.custosFixos, DATA.config.pizzasVendidasMes);
+    _lucro(custoTotal, preco);
+    _debCard();
+  }
+
+  const _debCard = FTUtils.debounce(() => cardapioModule.render(), 400);
+
+  // FIX: imap calculado uma única vez; campo qtd (não mais peso)
+  function atualizarQtd(idx, val) {
+    if (!_pizzaId) return;
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza||!pizza.fichas[_tam]) return;
+    pizza.fichas[_tam].ingredientes[idx].qtd = parseFloat(val)||0;
+    persistir();
+    const imap  = _imap(); // FIX: única chamada
+    const ficha = pizza.fichas[_tam];
+    const {custoIngr,pesoTotal,custoFixo,custoTotal} = FTCalc.custoFicha(ficha, imap, DATA.custosFixos, DATA.config.pizzasVendidasMes);
+    const set = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+    set('ft-peso-total', FTUtils.fmtN(pesoTotal)+' g');
+    set('ft-custo-ingr', FTUtils.fmt(custoIngr));
+    set('ft-custo-fixo-badge', FTUtils.fmt(custoFixo));
+    set('res-custo', FTUtils.fmt(custoTotal));
+    set('res-peso',  FTUtils.fmtN(pesoTotal)+' g');
+    _lucro(custoTotal, parseFloat(ficha.preco)||0);
+    // Atualiza célula de custo na linha sem re-render
+    const rows = document.querySelectorAll('#tbody-ficha tr');
+    if (rows[idx]) {
+      const ing   = imap.get(ficha.ingredientes[idx].id);
+      const tds   = rows[idx].querySelectorAll('td');
+      if (ing && tds[3]) tds[3].textContent = FTUtils.fmt(FTCalc.custoIngrediente(ing, parseFloat(val)||0));
+    }
+    _debCard();
+  }
+
+  function adicionarIngrediente() {
+    if (!_pizzaId) return;
+    if (!DATA.ingredientes.length) { FTUtils.toast('Cadastre ingredientes primeiro'); return; }
+    FTModal.abrirAddIngrediente(); // FIX: modal em vez de prompt()
+  }
+
+  function removerIngrediente(idx) {
+    if (!_pizzaId) return;
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza||!pizza.fichas[_tam]) return;
+    pizza.fichas[_tam].ingredientes.splice(idx,1);
+    persistir(); renderFicha();
+  }
+
+  function novaPizza() {
+    const nome = prompt('Nome da nova pizza:');
+    if (!nome||!nome.trim()) return;
+    const nova = {
+      id: FTUtils.nextId(DATA.pizzas),
+      nome: nome.trim().toUpperCase(),
+      fichas: Object.fromEntries(SIZES.map(s => [s, {ingredientes:[],preco:0}]))
+    };
+    DATA.pizzas.push(nova); persistir();
+    _pizzaId = nova.id;
+    atualizarSelectPizzas(); renderFicha();
+    cardapioModule.render(); preparoModule.renderInputs();
+    FTUtils.toast(`Pizza "${nova.nome}" criada!`);
+  }
+
+  function renomear() {
+    if (!_pizzaId) { FTUtils.toast('Selecione uma pizza'); return; }
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza) return;
+    const nome = prompt('Novo nome:', pizza.nome);
+    if (!nome||!nome.trim()) return;
+    pizza.nome = nome.trim().toUpperCase(); persistir();
+    atualizarSelectPizzas(); renderFicha(); cardapioModule.render();
+    FTUtils.toast('Pizza renomeada');
+  }
+
+  function excluirPizza() {
+    if (!_pizzaId) { FTUtils.toast('Selecione uma pizza'); return; }
+    const pizza = DATA.pizzas.find(p => p.id === _pizzaId);
+    if (!pizza) return;
+    FTUtils.confirmar(`Excluir "${pizza.nome}"? Ação irreversível.`, () => {
+      DATA.pizzas = DATA.pizzas.filter(p => p.id !== _pizzaId);
+      _pizzaId = null; persistir();
+      atualizarSelectPizzas(); renderFicha();
+      cardapioModule.render(); preparoModule.renderInputs();
+      FTUtils.toast('Pizza excluída');
+    });
+  }
+
+  return { atualizarSelectPizzas, selecionarPizza, renderFicha,
+           atualizarPreco, atualizarQtd,
+           adicionarIngrediente, removerIngrediente,
+           novaPizza, renomear, excluirPizza };
+})();
+
+// ── ft-cardapio.js ─────────────────────────────────────
+const cardapioModule = (() => {
+  function render() {
+    const cont = document.getElementById('cardapio-container');
+    if (!cont) return;
+    if (!DATA.pizzas.length) {
+      cont.innerHTML = '<div class="empty-state"><div class="empty-icon">🍕</div><p>Nenhuma pizza cadastrada</p></div>';
+      return;
+    }
+    const imap = _imap();
+    cont.innerHTML = DATA.pizzas.map(pizza => {
+      // FIX CRÍTICO: sizeCells é array — .join('') só na interpolação
+      const sizeCells = SIZES.map(sz => {
+        const ficha = pizza.fichas[sz] || {ingredientes:[],preco:0};
+        const preco = parseFloat(ficha.preco)||0;
+        if (!ficha.ingredientes.length && preco === 0) {
+          return `<div class="cardapio-size-cell no-price">
+            <div class="cardapio-size-label">${sz}cm</div>
+            <div class="cardapio-size-price">—</div>
+          </div>`;
+        }
+        const {custoTotal} = FTCalc.custoFicha(ficha, imap, DATA.custosFixos, DATA.config.pizzasVendidasMes);
+        const lucro = FTCalc.lucroBruto(preco, custoTotal);
+        const marg  = FTCalc.margem(preco, custoTotal);
+        const mc    = marg>=30?'var(--green)':marg>=15?'var(--yellow)':'var(--red)';
+        return `<div class="cardapio-size-cell">
+          <div class="cardapio-size-label">${sz}cm</div>
+          <div class="cardapio-size-price">${preco>0?'R$ '+FTUtils.fmtN(preco,2):'—'}</div>
+          <div class="cardapio-size-lucro" style="color:${mc}">
+            ${lucro>=0?'+':''}${FTUtils.fmt(lucro)} (${FTUtils.fmtN(marg,0)}%)
+          </div>
+        </div>`;
+      }); // ← array, sem .join('')
+
+      const tam = Object.values(pizza.fichas||{}).filter(f=>f.preco>0).length;
+      const hdr = (sl) =>
+        `<div style="display:grid;grid-template-columns:repeat(3,1fr);background:var(--ft-blue);padding:6px 0;text-align:center">
+          ${sl.map(s=>`<div style="font-size:10px;font-weight:800;color:#fff">${s}cm</div>`).join('')}
+        </div>`;
+
+      return `<div class="cardapio-pizza-card">
+        <div class="cardapio-pizza-header">
+          <span>🍕 ${pizza.nome}</span>
+          <span class="badge badge-teal">${tam} tamanhos</span>
+        </div>
+        <div>
+          ${hdr(SIZES.slice(0,3))}
+          <div class="cardapio-sizes">${sizeCells.slice(0,3).join('')}</div>
+          ${hdr(SIZES.slice(3))}
+          <div class="cardapio-sizes">${sizeCells.slice(3).join('')}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return { render };
+})();
+
+// ── ft-custos.js ───────────────────────────────────────
+const custosModule = (() => {
+  function render() {
+    const tbody = document.getElementById('tbody-custos');
+    if (!tbody) return;
+    tbody.innerHTML = DATA.custosFixos.length
+      ? DATA.custosFixos.map(c => `<tr>
+          <td>${c.nome}</td>
+          <td class="font-mono">${FTUtils.fmt(c.valor)}</td>
+          <td><button class="btn btn-danger btn-icon" onclick="FT.custos.remover(${c.id})">🗑</button></td>
+        </tr>`).join('')
+      : '<tr><td colspan="3"><div class="empty-state"><div class="empty-icon">💰</div><p>Nenhum custo cadastrado</p></div></td></tr>';
+    recalcular();
+  }
+
+  function adicionar() {
+    const nome  = document.getElementById('cf-nome').value.trim().toUpperCase();
+    const valor = parseFloat(document.getElementById('cf-valor').value);
+    if (!nome)                { FTUtils.toast('Informe a descrição'); return; }
+    if (isNaN(valor)||valor<0){ FTUtils.toast('Valor inválido'); return; }
+    DATA.custosFixos.push({id:FTUtils.nextId(DATA.custosFixos), nome, valor});
+    persistir();
+    document.getElementById('cf-nome').value  = '';
+    document.getElementById('cf-valor').value = '';
+    render(); FTUtils.toast('Custo adicionado!');
+  }
+
+  function remover(id) {
+    FTUtils.confirmar('Remover este custo?', () => {
+      DATA.custosFixos = DATA.custosFixos.filter(c => c.id !== id);
+      persistir(); render(); fichaModule.renderFicha();
+    });
+  }
+
+  function recalcular() {
+    const total = DATA.custosFixos.reduce((s,c) => s+(parseFloat(c.valor)||0), 0);
+    const qtd   = parseInt(document.getElementById('cf-qtd-pizzas')?.value)||1;
+    const dias  = parseInt(document.getElementById('cf-dias')?.value)||1;
+    DATA.config.pizzasVendidasMes = qtd;
+    DATA.config.diasTrabalhados   = dias;
+    persistir();
+    const porPizza = total/qtd, porDia = total/dias;
+    let somaP=0, ctP=0;
+    DATA.pizzas.forEach(p => Object.values(p.fichas||{}).forEach(f => { if(f.preco>0){somaP+=f.preco;ctP++;} }));
+    const media = ctP>0?somaP/ctP:0;
+    const pDia  = media>0?porDia/media:0;
+    const set   = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+    set('cf-total', FTUtils.fmt(total));
+    set('cf-por-pizza', FTUtils.fmt(porPizza));
+    set('cf-por-dia', FTUtils.fmt(porDia));
+    set('cf-pizzas-dia', FTUtils.fmtN(pDia,1));
+    set('cf-total-footer', FTUtils.fmt(total));
+    fichaModule.renderFicha();
+    cardapioModule.render();
+  }
+
+  return { render, adicionar, remover, recalcular };
+})();
+
+// ── ft-preparo.js ──────────────────────────────────────
+const preparoModule = (() => {
+  // FIX: usa SIZES do escopo global (não redeclara)
+  function renderInputs() {
+    const cont = document.getElementById('preparo-inputs-container');
+    if (!cont) return;
+    if (!DATA.pizzas.length) {
+      cont.innerHTML = '<p style="color:var(--text-3);font-size:13px">Cadastre pizzas na Ficha Técnica.</p>';
+      return;
+    }
+    cont.innerHTML = DATA.pizzas.map(p => {
+      const rows = SIZES.map(sz => {
+        const f = p.fichas[sz];
+        if (!f||!f.ingredientes.length) return '';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <span style="font-size:12px;color:var(--text-2);min-width:40px">${sz}cm</span>
+          <input type="number" class="ft-input input-sm" min="0" value="0" inputmode="numeric"
+            id="prep-${p.id}-${sz}" style="width:70px" placeholder="0">
+          <span style="font-size:11px;color:var(--text-3)">unidades</span>
+        </div>`;
+      }).filter(Boolean).join('');
+      if (!rows) return '';
+      return `<div style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <div style="font-weight:800;font-size:13px;color:var(--text-1);margin-bottom:4px">🍕 ${p.nome}</div>${rows}
+      </div>`;
+    }).filter(Boolean).join('');
+  }
+
+  function calcular() {
+    const totais = new Map();
+    DATA.pizzas.forEach(pizza => {
+      SIZES.forEach(sz => {
+        const inp = document.getElementById(`prep-${pizza.id}-${sz}`);
+        if (!inp) return;
+        const n = parseInt(inp.value)||0;
+        if (n<=0) return;
+        const f = pizza.fichas[sz];
+        if (!f) return;
+        f.ingredientes.forEach(fi => totais.set(fi.id, (totais.get(fi.id)||0) + fi.qtd*n));
+      });
+    });
+    if (!totais.size) { FTUtils.toast('Informe ao menos uma pizza'); return; }
+    const imap  = _imap();
+    const lista = document.getElementById('preparo-lista-ingredientes');
+    let html = '';
+    totais.forEach((total, id) => {
+      const ing = imap.get(id);
+      if (!ing) return;
+      const exib = FTCalc.isUnidade(ing) ? `${total} unidade(s)`
+        : total>=1000 ? `${FTUtils.fmtN(total/1000,3)} kg` : `${total} g`;
+      html += `<div class="preparo-item">
+        <span class="preparo-item-nome">${ing.nome}</span>
+        <span class="preparo-item-qtd">${exib}</span>
+      </div>`;
+    });
+    lista.innerHTML = html;
+    document.getElementById('preparo-resultado').style.display = 'block';
+    FTUtils.toast('Preparo calculado!');
+  }
+
+  function limpar() {
+    document.getElementById('preparo-resultado').style.display = 'none';
+    document.querySelectorAll('[id^="prep-"]').forEach(el => el.value='0');
+  }
+
+  return { renderInputs, calcular, limpar };
+})();
+
+
+// -- ft-help.js -------------------------------------------------------
+const FTHelp = (() => {
+  const SUBS = {
+    'help-cadastro': ['Toque para ver as instrucoes', 'Toque para fechar'],
+    'help-ficha':    ['Precificacao automatica por tamanho', 'Toque para fechar'],
+    'help-cardapio': ['Visao geral de precos e margens', 'Toque para fechar'],
+    'help-custos':   ['Rateio automatico nas fichas tecnicas', 'Toque para fechar'],
+    'help-preparo':  ['Calcule os ingredientes do dia em segundos', 'Toque para fechar'],
+  };
+  function toggle(id) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const isOpen = card.classList.toggle('open');
+    const sub = document.getElementById(id + '-sub');
+    if (sub && SUBS[id]) sub.textContent = SUBS[id][isOpen ? 1 : 0];
+  }
+  return { toggle };
+})();
+
+// ── API pública ────────────────────────────────────────
+window.FT = {
+  cadastro: cadastroModule,
+  ficha:    fichaModule,
+  cardapio: cardapioModule,
+  custos:   custosModule,
+  preparo:  preparoModule,
+
+  // FIX: item.preco não existe no modelo StockFlow v9.7.4
+  // Documentado para inclusão em versão futura (tabela.js + coletarDadosDaTabela)
+  syncFromStockFlow(estoqueItens) {
+    if (!Array.isArray(estoqueItens)) return 0;
+    let n = 0;
+    estoqueItens.forEach(item => {
+      if (!item.n) return;
+      const ing   = DATA.ingredientes.find(i => i.nome.toLowerCase() === item.n.toLowerCase());
+      const preco = parseFloat(item.preco); // campo reservado — ausente em v9.7.4
+      if (ing && !isNaN(preco) && preco>0) { ing.valorPago=preco; n++; }
+    });
+    if (n>0) {
+      persistir(); cadastroModule.render(); fichaModule.renderFicha(); cardapioModule.render();
+      FTUtils.toast(`${n} preço(s) sincronizado(s)`);
+    }
+    return n;
+  },
+
+  // FIX: deep copy — não expõe referências internas
+  exportData() { return JSON.parse(JSON.stringify(DATA)); }
+};
+
+// ── inicialização ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Navegação entre abas
+  document.querySelectorAll('.ft-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ft-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.ft-section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-'+tab.dataset.tab)?.classList.add('active');
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  });
+
+  // FIX: Enter key nos formulários
+  ['cad-nome','cad-valor','cad-peso'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+      if (e.key==='Enter') { e.preventDefault(); FT.cadastro.adicionar(); }
+    });
+  });
+  ['cf-nome','cf-valor'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+      if (e.key==='Enter') { e.preventDefault(); FT.custos.adicionar(); }
+    });
+  });
+  document.getElementById('modal-ing-qtd')?.addEventListener('keydown', e => {
+    if (e.key==='Enter') { e.preventDefault(); FTModal.confirmar(); }
+  });
+
+  // Fechar overlay ao clicar fora
+  document.getElementById('overlay-add-ing')?.addEventListener('click', e => {
+    if (e.target===e.currentTarget) FTModal.fechar();
+  });
+
+  // Render inicial
+  cadastroModule.render();
+  fichaModule.atualizarSelectPizzas();
+  fichaModule.renderFicha();
+  cardapioModule.render();
+  custosModule.render();
+  preparoModule.renderInputs();
+
+  const qp = document.getElementById('cf-qtd-pizzas');
+  const di = document.getElementById('cf-dias');
+  if (qp) qp.value = DATA.config.pizzasVendidasMes||1000;
+  if (di) di.value = DATA.config.diasTrabalhados||20;
+  custosModule.recalcular();
+});
+</script>
+</body>
+</html>
