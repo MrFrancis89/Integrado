@@ -1,4 +1,4 @@
-// sw.js — StockFlow Pro Service Worker v9.7.4
+// sw.js — StockFlow Pro Service Worker v9.7.6
 // ══════════════════════════════════════════════════════════════════
 // CORREÇÕES APLICADAS
 // ══════════════════════════════════════════════════════════════════
@@ -38,6 +38,9 @@ const ASSETS = [
     './style.css',
     './massa-extra.css',
     './apple-overrides.css', // BUG FIX #2: ausente na versão anterior — quebrava offline no iOS.
+    './patch-v976.css',      // BUG FIX v9.7.6: ausente — sem este arquivo o layout da aba Ficha Técnica
+                             //   (flex, height, iframe) não é aplicado e a aba aparece em branco.
+    './ficha-tecnica.html',  // BUG FIX v9.7.6: ausente — offline a aba Ficha Técnica falha completamente.
     './manifest.json',
     './icone.png',
     './fundo-pizza.jpg',
