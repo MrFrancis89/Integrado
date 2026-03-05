@@ -634,12 +634,8 @@ body.light-mode   .nav-tab.active .tab-icon {
   overflow: hidden;        /* o overflow fica na section, não no container */
 }
 /* Quando a aba está ativa, ativa o flex */
-/* BUG FIX DEFINITIVO: .tab-content.active { display: block } em style.css vence
- * sobre .ft-embed-container (class selector) carregado depois.
- * Seletor ID (#fichatecnica-section) tem especificidade maior e resolve o conflito
- * sem precisar de !important. */
 #fichatecnica-section.active {
-  display: flex !important; /* !important como seguro contra qualquer ordem de cascata futura */
+  display: flex !important;
 }
 
 .ft-embed-container {
@@ -717,4 +713,126 @@ body.light-mode   .nav-tab[data-tab="fichatecnica"]::after {
   .nav-tab:nth-child(7) {
     grid-column: auto;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FEATURE — Menu de abas retrátil  v9.7.7
+   Botão pill abaixo do header que recolhe/expande o #nav-tabs-panel.
+   Estado persistido em localStorage ('navCollapsed').
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Botão toggle ──────────────────────────────────────────────────────────── */
+.btn-nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  /* pill bem fino — não rouba espaço */
+  padding: 5px 14px;
+  margin: 0 0 5px;
+  border: none;
+  border-radius: var(--radius-full, 999px);
+  background: transparent;
+  color: var(--text-muted, #8E8E93);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.18s, background 0.18s;
+  /* Linha separadora sutil */
+  border-top: 1px solid var(--border, rgba(255,255,255,0.10));
+}
+.btn-nav-toggle:hover {
+  color: var(--text-soft, #C7C7CC);
+  background: var(--surface-2, rgba(255,255,255,0.06));
+}
+.btn-nav-toggle:active { transform: scale(0.97); }
+
+/* Rótulo "menu" / "abas" */
+.toggle-label { line-height: 1; }
+
+/* Seta: aponta PARA CIMA quando expandido → recolher */
+.toggle-chevron {
+  transition: transform 0.30s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+}
+
+/* Quando o painel está recolhido: seta aponta para BAIXO → expandir */
+#nav-tabs-panel.nav-collapsed ~ * { /* não usado */ }
+.btn-nav-toggle[aria-expanded="false"] .toggle-chevron {
+  transform: rotate(180deg);
+}
+.btn-nav-toggle[aria-expanded="false"] .toggle-label::after {
+  content: '';
+}
+
+/* ── Painel de abas: transição de altura ────────────────────────────────────
+   Usa max-height + opacity para animar sem JS de layout.
+   grid com 7 botões (~54px cada linha × 2 linhas) ≈ 120px + padding 10px = 130px.
+   Margem de segurança: 160px.
+   ──────────────────────────────────────────────────────────────────────────── */
+#nav-tabs-panel {
+  overflow: hidden;
+  max-height: 200px;   /* valor maior que a altura real → nunca corta */
+  opacity: 1;
+  /* cubic-bezier spring suave */
+  transition:
+    max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity    0.25s ease,
+    margin     0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    padding    0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  /* mantém margin-bottom padrão quando expandido */
+}
+
+/* Estado recolhido */
+#nav-tabs-panel.nav-collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  padding: 0;
+  /* pointer-events: none garante que os botões invisíveis não recebam cliques */
+  pointer-events: none;
+}
+
+/* Linha indicadora de aba ativa — visível quando o menu está recolhido */
+.nav-collapsed-indicator {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-primary, #0A84FF);
+  margin-bottom: 6px;
+  transition: opacity 0.2s;
+}
+.nav-collapsed-indicator.visible {
+  display: flex;
+}
+.nav-collapsed-indicator svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Temas claros (Arctic / light-mode) */
+body.theme-arctic .btn-nav-toggle,
+body.light-mode   .btn-nav-toggle {
+  border-top-color: rgba(0,0,0,0.10);
+  color: #8E8E93;
+}
+body.theme-arctic .btn-nav-toggle:hover,
+body.light-mode   .btn-nav-toggle:hover {
+  background: rgba(0,0,0,0.05);
+  color: #3C3C43;
+}
+
+/* Tema Forest */
+body.theme-forest .btn-nav-toggle:hover {
+  background: rgba(48,209,88,0.08);
+  color: var(--btn-green, #30D158);
 }
