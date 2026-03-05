@@ -245,6 +245,10 @@ body {
 }
 
 /* ── Background fixo — div real resolve bug Safari iOS (position:fixed zoom) ── */
+/* BUG FIX v9.7.8: will-change:transform em position:fixed quebra o comportamento
+   fixo no Safari iOS — o elemento perde a ancoragem ao viewport, passa a rolar
+   e a escalar com a página até o limite do tamanho da imagem.
+   translateZ(0) é suficiente para promover ao GPU layer; will-change é removido. */
 #bg-fixed {
   position: fixed;
   inset: 0;
@@ -254,12 +258,11 @@ body {
   opacity: 0.55;
   z-index: -1;
   pointer-events: none;
-  /* GPU compositing: mantém o layer fixo sem repaint no scroll */
+  /* GPU compositing via translateZ(0) — sem will-change (quebra fixed no Safari) */
   -webkit-transform: translateZ(0);
           transform: translateZ(0);
   -webkit-backface-visibility: hidden;
           backface-visibility: hidden;
-  will-change: transform;
   transition: opacity 0.45s var(--ease-out);
 }
 body.theme-midnight #bg-fixed { opacity: 0.40; }
