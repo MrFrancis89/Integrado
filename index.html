@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="massa-extra.css">
     <link rel="stylesheet" href="apple-overrides.css">
-    <link rel="stylesheet" href="patch-v976.css"><!-- v9.7.6: layout Ficha Técnica (flex, iframe height) + bug fixes -->
+    <link rel="stylesheet" href="patch-v976.css"><!-- v9.7.6+: fixes + layout Ficha Técnica + menu retrátil -->
 </head>
 <body>
 
@@ -244,7 +244,14 @@
     </div>
 
     <!-- ===== MENU DE ABAS ===== -->
-    <div class="nav-tabs">
+    <!-- btn-nav-toggle: recolhe/expande o grid de abas -->
+    <button id="btn-nav-toggle" class="btn-nav-toggle" aria-label="Recolher menu" aria-expanded="true" title="Recolher menu de abas">
+        <svg class="toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="18 15 12 9 6 15"/>
+        </svg>
+        <span class="toggle-label">menu</span>
+    </button>
+    <div id="nav-tabs-panel" class="nav-tabs"
 
         <!-- ESTOQUE: prateleira com 3 planos — warehouse/shelf thin-line -->
         <button class="nav-tab active" data-tab="estoque">
