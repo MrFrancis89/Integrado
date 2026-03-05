@@ -619,49 +619,27 @@ body.light-mode   .nav-tab.active .tab-icon {
  * overflow do pai para scrollar — o pai só precisa não cortar o iframe.
  * Solução: overflow:visible (default) no container; o iframe controla seu scroll.
  *
- * BUG FIX #2 (v9.7.6 REVISADO): a abordagem anterior com
- * height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))
- * tinha DOIS problemas críticos:
- *   a) `dvh` só é suportado a partir do Safari 16 (iOS 16). No iOS 15 e
- *      anteriores o valor inteiro era ignorado → height: auto → section colapsa
- *      para 0px → iframe invisível (apenas elementos position:sticky aparecem).
- *      Esse é o bug que gera a visual da print: header teal + nav do sub-app
- *      visíveis, mas o fundo do StockFlow aparece logo abaixo.
- *   b) O cálculo não descontava a altura real do header + grid de abas do
- *      StockFlow (~200px), causando overflow de ~200px além do viewport.
- * Solução v9.7.6: a altura é controlada por JS em navegacao.js via
- * section.style.height = calculada no rAF após a section ficar display:flex.
- * O CSS aqui serve apenas como FALLBACK para o primeiro render (antes do JS).
- * Usa 100vh (suporte universal) subtraindo uma estimativa conservadora.
+ * BUG FIX #2: height:calc(100dvh - 192px) era frágil — a soma 56+70+66=192px
+ * assumia alturas fixas que variam entre temas, dispositivos e Dynamic Island.
+ * Solução: layout flex na section pai; o iframe usa flex:1 para ocupar o
+ * espaço restante sem cálculo manual.
  */
 #fichatecnica-section {
   /* Flex column: ocupa o espaço disponível na viewport sem cálculo manual */
   display: none;           /* mantido oculto quando inativo */
   flex-direction: column;
-
-  /*
-   * FALLBACK de altura (usado até o JS em navegacao.js definir style.height):
-   * Cadeia de fallback: 100vh (suporte universal) → 100svh → 100dvh.
-   * Subtrai ~230px estimando: safe-area-top (~50px) + safe-area-bottom (~34px)
-   * + header StockFlow (~70px) + grid 7 abas em 2 linhas (~76px × 2 = ~152px).
-   * O JS substitui com o valor exato no momento da ativação.
-   *
-   * BUG FIX #2a: fallback 100vh garante que iOS 15 (sem dvh) tenha ao menos
-   * uma altura razoável antes do JS atualizar.
-   */
-  height: calc(100vh  - 230px);  /* fallback universal — iOS 15 e abaixo     */
-  height: calc(100svh - 230px);  /* svh: Safari 15.4+ — melhor que vh no iOS */
-  height: calc(100dvh - 230px);  /* dvh: Safari 16+   — o mais preciso       */
-
-  max-height: calc(100vh  - 180px);
-  max-height: calc(100svh - 180px);
-  max-height: calc(100dvh - 180px);
-
+  /* height = viewport menos o que o StockFlow usa acima */
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: 100dvh;
   overflow: hidden;        /* o overflow fica na section, não no container */
 }
 /* Quando a aba está ativa, ativa o flex */
+/* BUG FIX DEFINITIVO: .tab-content.active { display: block } em style.css vence
+ * sobre .ft-embed-container (class selector) carregado depois.
+ * Seletor ID (#fichatecnica-section) tem especificidade maior e resolve o conflito
+ * sem precisar de !important. */
 #fichatecnica-section.active {
-  display: flex !important;
+  display: flex !important; /* !important como seguro contra qualquer ordem de cascata futura */
 }
 
 .ft-embed-container {
